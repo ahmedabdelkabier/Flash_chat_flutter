@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flash_chat/constants.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flash_chat/Components/messageBubble.dart';
 
 class ChatScreen extends StatefulWidget {
   static const String id = 'chat';
@@ -11,6 +12,7 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  final messageController = TextEditingController();
   final _fireStore = FirebaseFirestore.instance;
   late String messageText;
   final _auth = FirebaseAuth.instance;
@@ -30,14 +32,6 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  void getMessages() async {
-    await for (var snapshots in _fireStore.collection('messages').snapshots()) {
-      for (var message in snapshots.docs) {
-        print(message.data());
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -45,14 +39,13 @@ class _ChatScreenState extends State<ChatScreen> {
         leading: null,
         actions: <Widget>[
           IconButton(
-              icon: Icon(Icons.close),
+              icon: const Icon(Icons.close),
               onPressed: () {
-                //_auth.signOut();
-                //Navigator.pop(context);
-                getMessages();
+                _auth.signOut();
+                Navigator.pop(context);
               }),
         ],
-        title: Text('⚡️Chat'),
+        title: const Text('⚡️Chat'),
         backgroundColor: Colors.lightBlueAccent,
       ),
       body: SafeArea(
@@ -71,16 +64,23 @@ class _ChatScreenState extends State<ChatScreen> {
                   );
                 }
                 final messages = snapshot.data;
-                List<Text> messagesWidget = [];
-                for (var message in messages!.docs) {
+                List<MessageBubble> messagesWidget = [];
+                for (var message in messages!.docs.reversed) {
                   final messageText = message.data()['text'];
                   final sender = message.data()['sender'];
                   messagesWidget.add(
-                    Text('$messageText from $sender'),
+                    MessageBubble(
+                      message: messageText,
+                      sender: sender,
+                      isMe: loggedinUser?.email == sender,
+                    ),
                   );
                 }
-                return Column(
-                  children: messagesWidget,
+                return Expanded(
+                  child: ListView(
+                    reverse: true,
+                    children: messagesWidget,
+                  ),
                 );
               },
             ),
@@ -91,6 +91,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 children: <Widget>[
                   Expanded(
                     child: TextField(
+                      controller: messageController,
                       onChanged: (value) {
                         //Do something with the user input.
                         messageText = value;
@@ -100,13 +101,13 @@ class _ChatScreenState extends State<ChatScreen> {
                   ),
                   TextButton(
                     onPressed: () {
-                      //Implement send functionality.
+                      messageController.clear();
                       _fireStore.collection('messages').add({
                         'text': messageText,
                         'sender': loggedinUser?.email,
                       });
                     },
-                    child: Text(
+                    child: const Text(
                       'Send',
                       style: kSendButtonTextStyle,
                     ),
